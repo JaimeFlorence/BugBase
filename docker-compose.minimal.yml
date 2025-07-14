@@ -1,0 +1,165 @@
+version: '3.8'
+
+# Minimal Docker Compose for Ultra-Small Teams (2-10 developers)
+# Absolute minimum resources while maintaining functionality
+
+services:
+  # PostgreSQL Database - Minimal configuration
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-bugbase}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Database password required}
+      POSTGRES_DB: ${DB_NAME:-bugbase}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bugbase}"]
+      interval: 60s
+      timeout: 10s
+      retries: 2
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    command: >
+      postgres -c max_connections=20
+               -c shared_buffers=64MB
+               -c effective_cache_size=128MB
+               -c maintenance_work_mem=16MB
+               -c checkpoint_completion_target=0.9
+               -c wal_buffers=4MB
+
+  # Redis Cache - Minimal memory
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:?Redis password required} --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  # Backend API - Minimal resources
+  backend:
+    image: ${DOCKER_REGISTRY:-}bugbase-backend:${VERSION:-latest}
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-bugbase}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-bugbase}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT secret required}
+      SESSION_SECRET: ${SESSION_SECRET:?Session secret required}
+      PASSWORD_PEPPER: ${PASSWORD_PEPPER:?Password pepper required}
+      COOKIE_SECRET: ${COOKIE_SECRET:?Cookie secret required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://bugbase.example.com}
+      LOG_LEVEL: error  # Minimal logging
+      ENABLE_REALTIME: "false"  # Disable real-time features to save resources
+      ENABLE_METRICS: "false"
+      MAX_FILE_SIZE: 2097152  # 2MB limit
+      DISABLE_BACKGROUND_JOBS: "true"  # Reduce CPU usage
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health/live"]
+      interval: 120s
+      timeout: 10s
+      retries: 2
+      start_period: 30s
+    networks:
+      - backend
+      - frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 384M
+        reservations:
+          cpus: '0.25'
+          memory: 192M
+
+  # Frontend - Minimal Nginx
+  frontend:
+    image: ${DOCKER_REGISTRY:-}bugbase-frontend:${VERSION:-latest}
+    restart: always
+    environment:
+      - API_URL=http://backend:3000
+      - DISABLE_ANALYTICS=true
+    ports:
+      - "80:8080"
+      - "443:8443"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 120s
+      timeout: 10s
+      retries: 2
+    networks:
+      - frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+
+  # Basic backup - Manual only (no cron)
+  backup:
+    image: postgres:15-alpine
+    restart: "no"  # Manual execution only
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${DB_USER:-bugbase}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-bugbase}
+    volumes:
+      - ./scripts/backup-minimal.sh:/backup.sh:ro
+      - backup_temp:/backup
+    networks:
+      - backend
+    profiles: ["backup"]  # Only run when explicitly requested
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
+  backup_temp:
+    driver: local

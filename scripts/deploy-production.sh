@@ -48,6 +48,8 @@ DRY_RUN=false
 SKIP_SSL=false
 SKIP_MONITORING=false
 HOSTINGER_MODE=false
+SMALL_TEAM=false
+MINIMAL=false
 REPO_URL=""
 DOMAIN=""
 EMAIL=""
@@ -56,6 +58,9 @@ EMAIL=""
 HOSTINGER_OPTIMIZATIONS=true
 ENABLE_SWAP=true
 OPTIMIZE_FOR_NVME=true
+
+# Small team settings
+COMPOSE_FILE="docker-compose.production.yml"
 
 # Colors for output
 RED='\033[0;31m'
@@ -222,6 +227,19 @@ parse_arguments() {
                 HOSTINGER_MODE=true
                 shift
                 ;;
+            --small-team)
+                SMALL_TEAM=true
+                COMPOSE_FILE="docker-compose.small-team.yml"
+                TOTAL_STEPS=20  # Fewer steps for small team
+                shift
+                ;;
+            --minimal)
+                MINIMAL=true
+                COMPOSE_FILE="docker-compose.minimal.yml"
+                SKIP_MONITORING=true  # Force disable monitoring
+                TOTAL_STEPS=18  # Minimal steps
+                shift
+                ;;
             --help)
                 show_help
                 exit 0
@@ -264,27 +282,30 @@ OPTIONAL OPTIONS:
     --skip-ssl           Skip SSL certificate generation
     --skip-monitoring    Skip monitoring stack deployment
     --hostinger          Enable Hostinger VPS optimizations
+    --small-team         Optimize for small teams (5-15 developers)
+    --minimal            Ultra-minimal deployment (2-10 developers)
     --help               Show this help message
 
 EXAMPLES:
-    # Hostinger VPS deployment (recommended)
+    # Small team deployment (5-15 developers) - RECOMMENDED for most teams
+    sudo $0 --repo-url https://github.com/user/bugbase.git \\
+            --domain bugbase.com --email admin@bugbase.com \\
+            --hostinger --small-team
+
+    # Minimal deployment (2-10 developers, ultra-budget)
+    sudo $0 --repo-url https://github.com/user/bugbase.git \\
+            --domain bugbase.com --email admin@bugbase.com \\
+            --hostinger --minimal
+
+    # Full production deployment (enterprise, 50+ developers)
     sudo $0 --repo-url https://github.com/user/bugbase.git \\
             --domain bugbase.com --email admin@bugbase.com \\
             --hostinger
 
-    # Basic production deployment
-    sudo $0 --repo-url https://github.com/user/bugbase.git \\
-            --domain bugbase.com --email admin@bugbase.com
-
-    # Deploy specific branch with monitoring disabled
-    sudo $0 --repo-url https://github.com/user/bugbase.git \\
-            --domain bugbase.com --email admin@bugbase.com \\
-            --branch develop --skip-monitoring
-
     # Dry run to test the deployment process
     sudo $0 --repo-url https://github.com/user/bugbase.git \\
             --domain bugbase.com --email admin@bugbase.com \\
-            --dry-run
+            --dry-run --small-team
 
 EOF
 }
@@ -782,15 +803,24 @@ start_services() {
     
     cd "$INSTALL_DIR"
     
+    # Provide information about deployment type
+    if [[ "$SMALL_TEAM" == "true" ]]; then
+        log "INFO" "Using small team configuration - optimized for 5-15 developers"
+    elif [[ "$MINIMAL" == "true" ]]; then
+        log "INFO" "Using minimal configuration - optimized for 2-10 developers"
+    else
+        log "INFO" "Using full production configuration - optimized for enterprise"
+    fi
+    
     # Start database and Redis first
-    execute_command "docker-compose -f docker-compose.production.yml up -d postgres redis" "Start database services"
+    execute_command "docker-compose -f $COMPOSE_FILE up -d postgres redis" "Start database services"
     
     # Wait for database to be ready
     log "INFO" "Waiting for database to be ready..."
     local retries=30
     while [[ $retries -gt 0 ]]; do
         if [[ "$DRY_RUN" == "false" ]]; then
-            if docker-compose -f docker-compose.production.yml exec -T postgres pg_isready -U bugbase &>/dev/null; then
+            if docker-compose -f $COMPOSE_FILE exec -T postgres pg_isready -U bugbase &>/dev/null; then
                 break
             fi
         else
@@ -807,7 +837,7 @@ start_services() {
     log "INFO" "Database is ready"
     
     # Start all other services
-    execute_command "docker-compose -f docker-compose.production.yml up -d" "Start all services"
+    execute_command "docker-compose -f $COMPOSE_FILE up -d" "Start all services"
     
     log "INFO" "All services started successfully"
 }
@@ -821,11 +851,11 @@ run_database_migrations() {
     sleep 10
     
     # Run database migrations
-    execute_command "docker-compose -f docker-compose.production.yml exec -T backend npm run db:migrate:prod" "Run database migrations"
+    execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:migrate:prod" "Run database migrations"
     
     # Optionally seed initial data
     log "INFO" "Seeding initial database data..."
-    execute_command "docker-compose -f docker-compose.production.yml exec -T backend npm run db:seed || true" "Seed database (optional)"
+    execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:seed || true" "Seed database (optional)"
     
     log "INFO" "Database setup completed"
 }
@@ -851,7 +881,7 @@ setup_monitoring() {
     if [[ "$DRY_RUN" == "false" ]]; then
         local services=("prometheus" "grafana" "loki")
         for service in "${services[@]}"; do
-            if ! docker-compose -f docker-compose.production.yml ps | grep -q "$service.*Up"; then
+            if ! docker-compose -f $COMPOSE_FILE ps | grep -q "$service.*Up"; then
                 log "WARN" "Monitoring service $service may not be running properly"
             fi
         done
@@ -933,20 +963,20 @@ verify_deployment() {
     # Check container status
     local containers=("backend" "frontend" "postgres" "redis")
     for container in "${containers[@]}"; do
-        if ! docker-compose -f docker-compose.production.yml ps | grep -q "$container.*Up"; then
+        if ! docker-compose -f $COMPOSE_FILE ps | grep -q "$container.*Up"; then
             error_exit "Container $container is not running"
         fi
     done
     
     # Test database connection
     log "INFO" "Testing database connection..."
-    if ! docker-compose -f docker-compose.production.yml exec -T postgres psql -U bugbase -d bugbase -c "SELECT 1;" &>/dev/null; then
+    if ! docker-compose -f $COMPOSE_FILE exec -T postgres psql -U bugbase -d bugbase -c "SELECT 1;" &>/dev/null; then
         error_exit "Database connection test failed"
     fi
     
     # Test Redis connection
     log "INFO" "Testing Redis connection..."
-    if ! docker-compose -f docker-compose.production.yml exec -T redis redis-cli ping &>/dev/null; then
+    if ! docker-compose -f $COMPOSE_FILE exec -T redis redis-cli ping &>/dev/null; then
         error_exit "Redis connection test failed"
     fi
     
@@ -1006,7 +1036,7 @@ Domain: $DOMAIN
 Installation Directory: $INSTALL_DIR
 
 Services Status:
-$(docker-compose -f docker-compose.production.yml ps 2>/dev/null || echo "Unable to get service status")
+$(docker-compose -f $COMPOSE_FILE ps 2>/dev/null || echo "Unable to get service status")
 
 Endpoints:
 - Application: https://$DOMAIN
@@ -1021,9 +1051,9 @@ Important Files:
 - SSL Certificates: /etc/letsencrypt/live/$DOMAIN/
 
 Maintenance Commands:
-- View logs: docker-compose -f $INSTALL_DIR/docker-compose.production.yml logs
-- Restart services: docker-compose -f $INSTALL_DIR/docker-compose.production.yml restart
-- Update application: cd $INSTALL_DIR && git pull && docker-compose -f docker-compose.production.yml up -d --build
+- View logs: docker-compose -f $INSTALL_DIR/$COMPOSE_FILE logs
+- Restart services: docker-compose -f $INSTALL_DIR/$COMPOSE_FILE restart
+- Update application: cd $INSTALL_DIR && git pull && docker-compose -f $COMPOSE_FILE up -d --build
 - Manual backup: $INSTALL_DIR/scripts/backup.sh
 
 Security Notes:
