@@ -16,6 +16,6 @@ router.delete('/:id', BugController.deleteBug);
 
 // Bug watchers
 router.post('/:id/watchers', BugController.addWatcher);
-router.delete('/:id/watchers', BugController.removeWatcher);
+router.delete('/:id/watchers/:userId', BugController.removeWatcher);
 
 export default router;

@@ -21,10 +21,7 @@ export const errorHandler = (
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
-      error: {
-        message: err.message,
-        status: err.statusCode,
-      },
+      error: err.message,
     });
   }
 
@@ -32,9 +29,6 @@ export const errorHandler = (
   
   return res.status(500).json({
     success: false,
-    error: {
-      message: 'Internal server error',
-      status: 500,
-    },
+    error: 'Internal server error',
   });
 };

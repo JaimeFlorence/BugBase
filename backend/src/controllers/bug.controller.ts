@@ -53,7 +53,7 @@ export class BugController {
 
       res.status(201).json({
         success: true,
-        data: { bug }
+        data: bug
       });
     } catch (error) {
       next(error);
@@ -76,7 +76,7 @@ export class BugController {
 
       res.json({
         success: true,
-        data: { bug }
+        data: bug
       });
     } catch (error) {
       next(error);
@@ -194,7 +194,7 @@ export class BugController {
 
       res.json({
         success: true,
-        data: { bug }
+        data: bug
       });
     } catch (error) {
       next(error);
@@ -246,8 +246,7 @@ export class BugController {
 
   static async removeWatcher(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { id } = req.params;
-      const { userId } = req.body;
+      const { id, userId } = req.params;
 
       if (!req.user?.id) {
         throw new AppError('User not authenticated', 401);
