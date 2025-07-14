@@ -1,6 +1,5 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import { AuthService } from '../auth.service';
 import { AppError } from '../../middleware/errorHandler';
 
@@ -10,7 +9,8 @@ process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
 process.env.JWT_EXPIRES_IN = '15m';
 process.env.JWT_REFRESH_EXPIRES_IN = '30d';
 
-const mockPrisma = new PrismaClient() as jest.Mocked<PrismaClient>;
+// Get the global mock Prisma instance
+const mockPrisma = (global as any).mockPrisma;
 
 describe('AuthService', () => {
   beforeEach(() => {

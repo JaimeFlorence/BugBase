@@ -1,86 +1,92 @@
 // Setup file for Jest tests
 
+// Create mock Prisma instance that will be shared across all tests
+const mockPrismaInstance = {
+  user: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  project: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  projectMember: {
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    delete: jest.fn(),
+  },
+  bug: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    count: jest.fn(),
+  },
+  comment: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  attachment: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    delete: jest.fn(),
+  },
+  refreshToken: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  passwordReset: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  activityLog: {
+    create: jest.fn(),
+  },
+  bugWatcher: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    delete: jest.fn(),
+  },
+  mention: {
+    create: jest.fn(),
+    createMany: jest.fn(),
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  notification: {
+    createMany: jest.fn(),
+  },
+  $connect: jest.fn(),
+  $disconnect: jest.fn(),
+  $transaction: jest.fn().mockImplementation((queries) => Promise.all(queries)),
+};
+
 // Mock Prisma client for all tests
 jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    user: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    project: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    projectMember: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      delete: jest.fn(),
-    },
-    bug: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
-    },
-    comment: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    attachment: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      delete: jest.fn(),
-    },
-    refreshToken: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    passwordReset: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    activityLog: {
-      create: jest.fn(),
-    },
-    bugWatcher: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      delete: jest.fn(),
-    },
-    mention: {
-      create: jest.fn(),
-      createMany: jest.fn(),
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    notification: {
-      createMany: jest.fn(),
-    },
-    $connect: jest.fn(),
-    $disconnect: jest.fn(),
-    $transaction: jest.fn().mockImplementation((queries) => Promise.all(queries)),
-  }))
+  PrismaClient: jest.fn().mockImplementation(() => mockPrismaInstance)
 }));
+
+// Export the mock instance for use in tests
+(global as any).mockPrisma = mockPrismaInstance;
 
 // Mock Redis
 jest.mock('ioredis', () => {

@@ -1,10 +1,37 @@
-import { vi } from 'vitest';
+import { vi, beforeEach, describe, it, expect } from 'vitest';
+
+// Mock axios before importing the auth service
+vi.mock('axios', () => {
+  const mockApiInstance = {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  };
+
+  return {
+    default: {
+      create: vi.fn(() => mockApiInstance),
+      post: vi.fn(),
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    },
+  };
+});
+
 import axios from 'axios';
 import { authService } from '../auth.service';
 
-// Mock axios
-vi.mock('axios');
 const mockedAxios = axios as any;
+// Get the mocked api instance that was created
+const mockApiInstance = mockedAxios.create();
 
 describe('Auth Service', () => {
   beforeEach(() => {
@@ -23,11 +50,11 @@ describe('Auth Service', () => {
         }
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.login('test@example.com', 'password');
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/login', {
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/login', {
         email: 'test@example.com',
         password: 'password'
       });
@@ -36,7 +63,7 @@ describe('Auth Service', () => {
 
     it('should handle login errors', async () => {
       const mockError = new Error('Invalid credentials');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       await expect(authService.login('invalid@example.com', 'wrongpassword'))
         .rejects.toThrow('Invalid credentials');
@@ -61,17 +88,17 @@ describe('Auth Service', () => {
         username: 'testuser'
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.register(registrationData);
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/register', registrationData);
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/register', registrationData);
       expect(result).toEqual(mockResponse.data);
     });
 
     it('should handle registration errors', async () => {
       const mockError = new Error('Email already exists');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       const registrationData = {
         email: 'existing@example.com',
@@ -94,17 +121,17 @@ describe('Auth Service', () => {
         }
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.logout();
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/logout');
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/logout');
       expect(result).toEqual(mockResponse.data);
     });
 
     it('should handle logout errors', async () => {
       const mockError = new Error('Logout failed');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       await expect(authService.logout())
         .rejects.toThrow('Logout failed');
@@ -122,17 +149,17 @@ describe('Auth Service', () => {
         }
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.refreshToken();
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/refresh');
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/refresh');
       expect(result).toEqual(mockResponse.data);
     });
 
     it('should handle refresh token errors', async () => {
       const mockError = new Error('Invalid refresh token');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       await expect(authService.refreshToken())
         .rejects.toThrow('Invalid refresh token');
@@ -148,11 +175,11 @@ describe('Auth Service', () => {
         }
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.resetPasswordRequest('test@example.com');
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/reset-password-request', {
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/reset-password-request', {
         email: 'test@example.com'
       });
       expect(result).toEqual(mockResponse.data);
@@ -160,7 +187,7 @@ describe('Auth Service', () => {
 
     it('should handle reset password request errors', async () => {
       const mockError = new Error('Email not found');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       await expect(authService.resetPasswordRequest('invalid@example.com'))
         .rejects.toThrow('Email not found');
@@ -176,11 +203,11 @@ describe('Auth Service', () => {
         }
       };
 
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockApiInstance.post.mockResolvedValue(mockResponse);
 
       const result = await authService.resetPassword('reset-token', 'newpassword');
 
-      expect(mockedAxios.post).toHaveBeenCalledWith('/auth/reset-password', {
+      expect(mockApiInstance.post).toHaveBeenCalledWith('/auth/reset-password', {
         token: 'reset-token',
         password: 'newpassword'
       });
@@ -189,7 +216,7 @@ describe('Auth Service', () => {
 
     it('should handle reset password errors', async () => {
       const mockError = new Error('Invalid reset token');
-      mockedAxios.post.mockRejectedValue(mockError);
+      mockApiInstance.post.mockRejectedValue(mockError);
 
       await expect(authService.resetPassword('invalid-token', 'newpassword'))
         .rejects.toThrow('Invalid reset token');

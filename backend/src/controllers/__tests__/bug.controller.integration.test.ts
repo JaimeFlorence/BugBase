@@ -1,12 +1,11 @@
 import request from 'supertest';
 import express from 'express';
-import { bugRoutes } from '../../routes/bug.routes';
+import bugRoutes from '../../routes/bug.routes';
 import { errorHandler } from '../../middleware/errorHandler';
-import { authMiddleware } from '../../middleware/auth';
 
 // Mock the auth middleware
 jest.mock('../../middleware/auth', () => ({
-  authMiddleware: jest.fn((req, res, next) => {
+  authenticate: jest.fn((req, res, next) => {
     req.user = { id: 'test-user-id', email: 'test@example.com' };
     next();
   })
