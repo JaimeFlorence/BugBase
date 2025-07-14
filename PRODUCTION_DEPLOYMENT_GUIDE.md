@@ -1,10 +1,11 @@
 # Production Deployment Guide for BugBase
 
 ## Overview
-This guide provides comprehensive instructions for deploying BugBase to production. We offer two deployment methods:
+This guide provides comprehensive instructions for deploying BugBase to production. We offer multiple deployment methods:
 
-1. **🚀 Automated Deployment (Recommended)** - Zero-manual-steps deployment using our automated script
-2. **📋 Manual Deployment** - Step-by-step manual deployment for custom configurations
+1. **🏆 Hostinger VPS Deployment (Recommended)** - Optimized for Hostinger VPS with special pricing
+2. **🚀 Automated Deployment** - Zero-manual-steps deployment using our automated script  
+3. **📋 Manual Deployment** - Step-by-step manual deployment for custom configurations
 
 ## Prerequisites
 
@@ -24,7 +25,38 @@ This guide provides comprehensive instructions for deploying BugBase to producti
 
 ---
 
-## 🚀 Automated Deployment (Recommended)
+## 🏆 Hostinger VPS Deployment (Recommended)
+
+**Perfect hosting solution for BugBase with optimized performance and pricing!**
+
+### Why Choose Hostinger VPS?
+
+✅ **Ubuntu 22.04 LTS** with full root access  
+✅ **AMD EPYC processors** for excellent performance  
+✅ **NVMe SSD storage** for fast database operations  
+✅ **Docker pre-installed** templates available  
+✅ **Starting at $7.99/month** for KVM 2 plan  
+✅ **Built-in security features** and weekly backups  
+
+### Quick Hostinger Deployment
+
+```bash
+# One-command deployment on Hostinger VPS
+sudo ./deploy-production.sh \
+  --repo-url https://github.com/yourusername/bugbase.git \
+  --domain your-domain.com \
+  --email admin@your-domain.com \
+  --hostinger
+```
+
+### 📚 **Complete Hostinger Guide**
+For detailed Hostinger VPS setup, domain configuration, and optimization tips, see our comprehensive guide:
+
+**➡️ [Hostinger Deployment Guide](HOSTINGER_DEPLOYMENT_GUIDE.md)**
+
+---
+
+## 🚀 Automated Deployment (Generic VPS)
 
 ### Quick Start
 Deploy BugBase to production with a single command:

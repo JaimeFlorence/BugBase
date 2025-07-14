@@ -47,9 +47,15 @@ BRANCH="main"
 DRY_RUN=false
 SKIP_SSL=false
 SKIP_MONITORING=false
+HOSTINGER_MODE=false
 REPO_URL=""
 DOMAIN=""
 EMAIL=""
+
+# Hostinger-specific settings
+HOSTINGER_OPTIMIZATIONS=true
+ENABLE_SWAP=true
+OPTIMIZE_FOR_NVME=true
 
 # Colors for output
 RED='\033[0;31m'
@@ -212,6 +218,10 @@ parse_arguments() {
                 SKIP_MONITORING=true
                 shift
                 ;;
+            --hostinger)
+                HOSTINGER_MODE=true
+                shift
+                ;;
             --help)
                 show_help
                 exit 0
@@ -253,9 +263,15 @@ OPTIONAL OPTIONS:
     --dry-run            Simulate deployment without making changes
     --skip-ssl           Skip SSL certificate generation
     --skip-monitoring    Skip monitoring stack deployment
+    --hostinger          Enable Hostinger VPS optimizations
     --help               Show this help message
 
 EXAMPLES:
+    # Hostinger VPS deployment (recommended)
+    sudo $0 --repo-url https://github.com/user/bugbase.git \\
+            --domain bugbase.com --email admin@bugbase.com \\
+            --hostinger
+
     # Basic production deployment
     sudo $0 --repo-url https://github.com/user/bugbase.git \\
             --domain bugbase.com --email admin@bugbase.com
@@ -318,8 +334,157 @@ install_dependencies() {
     log "INFO" "System dependencies installed successfully"
 }
 
+detect_hostinger() {
+    log "STEP" "Detecting hosting environment"
+    
+    # Check for Hostinger-specific indicators
+    if [[ "$HOSTINGER_MODE" == "true" ]] || 
+       hostname | grep -q "hostinger" || 
+       dmidecode -s system-manufacturer 2>/dev/null | grep -qi "hostinger" ||
+       [[ -f "/etc/hostinger" ]] ||
+       grep -qi "hostinger" /proc/version 2>/dev/null; then
+        
+        HOSTINGER_MODE=true
+        log "INFO" "Hostinger VPS environment detected"
+        
+        # Auto-enable optimizations for Hostinger
+        HOSTINGER_OPTIMIZATIONS=true
+        ENABLE_SWAP=true
+        OPTIMIZE_FOR_NVME=true
+        
+        # Adjust for typical Hostinger VPS specs
+        if [[ $(nproc) -eq 2 && $(grep MemTotal /proc/meminfo | awk '{print $2}') -lt 9000000 ]]; then
+            log "INFO" "Detected KVM 2 plan (2 vCPU, 8GB RAM) - optimizing accordingly"
+            TOTAL_STEPS=22  # Reduce some optional steps for smaller VPS
+        fi
+        
+    else
+        log "INFO" "Generic VPS environment detected"
+    fi
+}
+
+setup_swap_for_hostinger() {
+    if [[ "$HOSTINGER_MODE" == "true" && "$ENABLE_SWAP" == "true" ]]; then
+        log "STEP" "Setting up swap for Hostinger VPS"
+        
+        # Check if swap already exists
+        if swapon --show | grep -q "/swapfile"; then
+            log "INFO" "Swap already configured"
+            return 0
+        fi
+        
+        # Calculate swap size based on RAM (1.5x RAM, max 4GB for smaller VPS)
+        local total_mem=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+        local mem_gb=$((total_mem / 1024 / 1024))
+        local swap_gb=$((mem_gb * 3 / 2))
+        
+        # Limit swap size for smaller VPS to save disk space
+        if [[ $swap_gb -gt 4 ]]; then
+            swap_gb=4
+        fi
+        
+        log "INFO" "Creating ${swap_gb}GB swap file for optimal performance"
+        
+        # Create swap file on NVMe storage
+        execute_command "fallocate -l ${swap_gb}G /swapfile" "Create swap file"
+        execute_command "chmod 600 /swapfile" "Set swap file permissions"
+        execute_command "mkswap /swapfile" "Format swap file"
+        execute_command "swapon /swapfile" "Enable swap"
+        
+        # Make swap permanent
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        
+        # Optimize swap usage for containers
+        echo 'vm.swappiness=10' >> /etc/sysctl.conf
+        echo 'vm.vfs_cache_pressure=50' >> /etc/sysctl.conf
+        
+        log "INFO" "Swap configured successfully"
+    fi
+}
+
+optimize_for_hostinger() {
+    if [[ "$HOSTINGER_MODE" == "true" && "$HOSTINGER_OPTIMIZATIONS" == "true" ]]; then
+        log "STEP" "Applying Hostinger VPS optimizations"
+        
+        # NVMe storage optimizations
+        if [[ "$OPTIMIZE_FOR_NVME" == "true" ]]; then
+            log "INFO" "Optimizing for NVMe storage"
+            
+            # Configure filesystem optimizations
+            cat >> /etc/fstab << 'EOF'
+# NVMe optimizations for Hostinger VPS
+tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
+EOF
+            
+            # Configure kernel parameters for NVMe
+            cat >> /etc/sysctl.conf << 'EOF'
+# NVMe and SSD optimizations
+vm.dirty_ratio=15
+vm.dirty_background_ratio=5
+vm.dirty_expire_centisecs=12000
+EOF
+        fi
+        
+        # Network optimizations for Hostinger infrastructure
+        cat >> /etc/sysctl.conf << 'EOF'
+# Network optimizations for Hostinger VPS
+net.core.rmem_max=16777216
+net.core.wmem_max=16777216
+net.ipv4.tcp_rmem=4096 87380 16777216
+net.ipv4.tcp_wmem=4096 65536 16777216
+net.ipv4.tcp_congestion_control=bbr
+EOF
+        
+        # Docker optimizations for Hostinger VPS
+        mkdir -p /etc/docker
+        cat > /etc/docker/daemon.json << 'EOF'
+{
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "default-runtime": "runc",
+  "default-shm-size": "64M"
+}
+EOF
+        
+        # CPU governor optimization for AMD EPYC
+        if grep -q "EPYC" /proc/cpuinfo; then
+            log "INFO" "Optimizing for AMD EPYC processor"
+            echo 'performance' | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null || true
+        fi
+        
+        log "INFO" "Hostinger optimizations applied"
+    fi
+}
+
 install_docker() {
     log "STEP" "Installing Docker and Docker Compose"
+    
+    # Check if we're on Hostinger with pre-installed Docker
+    if [[ "$HOSTINGER_MODE" == "true" ]] && command -v docker &> /dev/null; then
+        log "INFO" "Docker already installed on Hostinger VPS template"
+        
+        # Verify Docker Compose is also available
+        if ! command -v docker-compose &> /dev/null; then
+            log "INFO" "Installing Docker Compose on Hostinger VPS"
+            local compose_version="v2.24.1"
+            execute_command "curl -L \"https://github.com/docker/compose/releases/download/$compose_version/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose" "Download Docker Compose"
+            execute_command "chmod +x /usr/local/bin/docker-compose" "Make Docker Compose executable"
+        fi
+        
+        # Start and enable Docker service
+        execute_command "systemctl start docker" "Start Docker service"
+        execute_command "systemctl enable docker" "Enable Docker service"
+        
+        log "INFO" "Docker configuration completed for Hostinger VPS"
+        return 0
+    fi
     
     # Remove old Docker installations
     execute_command "apt-get remove -y docker docker-engine docker.io containerd runc || true" "Remove old Docker"
@@ -905,8 +1070,11 @@ main() {
     
     # Execute deployment steps
     check_prerequisites
+    detect_hostinger
     update_system
     install_dependencies
+    setup_swap_for_hostinger
+    optimize_for_hostinger
     install_docker
     setup_python_environment
     create_system_user

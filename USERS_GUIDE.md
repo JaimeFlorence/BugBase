@@ -591,6 +591,14 @@ javascript:(function(){
 - **Admin Contact**: Your BugBase administrator
 - **Phone Support**: Available during business hours
 
+#### 🏆 **Hostinger VPS Users**
+If your BugBase is hosted on Hostinger VPS:
+- **Hostinger Support**: 24/7 live chat in hPanel
+- **VPS Management**: Access via Hostinger control panel
+- **Performance Monitoring**: Built-in resource monitoring
+- **Automatic Backups**: Weekly snapshots included
+- **Deployment Guide**: [Hostinger Deployment Guide](HOSTINGER_DEPLOYMENT_GUIDE.md)
+
 ---
 
 ## 💡 Tips & Tricks
