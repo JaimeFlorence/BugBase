@@ -1,0 +1,367 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PROJECT_MANAGER
+  DEVELOPER
+  QA_TESTER
+  REPORTER
+  GUEST
+}
+
+enum BugStatus {
+  NEW
+  IN_PROGRESS
+  TESTING
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum BugPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum BugSeverity {
+  BLOCKER
+  MAJOR
+  MINOR
+  TRIVIAL
+}
+
+enum ActivityAction {
+  CREATED
+  UPDATED
+  DELETED
+  STATUS_CHANGED
+  ASSIGNED
+  COMMENTED
+  ATTACHED_FILE
+  REMOVED_FILE
+  LABELED
+  UNLABELED
+  MILESTONE_SET
+  MILESTONE_REMOVED
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  username          String    @unique
+  passwordHash      String
+  fullName          String
+  avatarUrl         String?
+  role              UserRole  @default(REPORTER)
+  isActive          Boolean   @default(true)
+  emailVerified     Boolean   @default(false)
+  timezone          String    @default("UTC")
+  notificationPrefs Json      @default("{}")
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  ownedProjects       Project[]       @relation("ProjectOwner")
+  projectMembers      ProjectMember[]
+  reportedBugs        Bug[]           @relation("Reporter")
+  assignedBugs        Bug[]           @relation("Assignee")
+  comments            Comment[]
+  activities          ActivityLog[]
+  uploadedAttachments Attachment[]
+  notifications       Notification[]
+  BugWatcher          BugWatcher[]
+  Mention             Mention[]
+  refreshTokens       RefreshToken[]
+  passwordResets      PasswordReset[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique
+  description String?
+  icon        String?
+  color       String   @default("#3B82F6")
+  isPublic    Boolean  @default(false)
+  settings    Json     @default("{}")
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner      User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members    ProjectMember[]
+  bugs       Bug[]
+  labels     Label[]
+  milestones Milestone[]
+
+  @@index([key])
+  @@index([ownerId])
+}
+
+model ProjectMember {
+  id          String   @id @default(cuid())
+  projectId   String
+  userId      String
+  permissions Json     @default("{}")
+  joinedAt    DateTime @default(now())
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model Bug {
+  id             String      @id @default(cuid())
+  projectId      String
+  bugNumber      Int
+  title          String
+  description    String
+  status         BugStatus   @default(NEW)
+  priority       BugPriority @default(MEDIUM)
+  severity       BugSeverity @default(MINOR)
+  reporterId     String
+  assigneeId     String?
+  dueDate        DateTime?
+  estimatedHours Float?
+  actualHours    Float?
+  versionFound   String?
+  versionFixed   String?
+  environment    String?
+  customFields   Json        @default("{}")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  resolvedAt     DateTime?
+
+  // Relations
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter    User          @relation("Reporter", fields: [reporterId], references: [id])
+  assignee    User?         @relation("Assignee", fields: [assigneeId], references: [id])
+  comments    Comment[]
+  attachments Attachment[]
+  labels      BugLabel[]
+  activities  ActivityLog[]
+  milestone   Milestone?    @relation(fields: [milestoneId], references: [id])
+  milestoneId String?
+  watchers    BugWatcher[]
+
+  @@unique([projectId, bugNumber])
+  @@index([projectId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([reporterId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  bugId     String
+  userId    String
+  content   String
+  parentId  String?
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  bug         Bug          @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id])
+  parent      Comment?     @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[]    @relation("CommentReplies")
+  attachments Attachment[]
+  mentions    Mention[]
+
+  @@index([bugId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  bugId        String?
+  commentId    String?
+  filename     String
+  originalName String
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  // Relations
+  bug        Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([bugId])
+  @@index([commentId])
+  @@index([uploadedById])
+}
+
+model Label {
+  id          String  @id @default(cuid())
+  projectId   String
+  name        String
+  color       String  @default("#6B7280")
+  description String?
+
+  // Relations
+  project Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bugs    BugLabel[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+}
+
+model BugLabel {
+  bugId      String
+  labelId    String
+  assignedAt DateTime @default(now())
+
+  // Relations
+  bug   Bug   @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([bugId, labelId])
+  @@index([bugId])
+  @@index([labelId])
+}
+
+model ActivityLog {
+  id        String         @id @default(cuid())
+  bugId     String
+  userId    String
+  action    ActivityAction
+  oldValue  Json?
+  newValue  Json?
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime       @default(now())
+
+  // Relations
+  bug  Bug  @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([bugId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  bugs    Bug[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@index([dueDate])
+}
+
+model BugWatcher {
+  bugId     String
+  userId    String
+  watchedAt DateTime @default(now())
+
+  // Relations
+  bug  Bug  @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([bugId, userId])
+  @@index([bugId])
+  @@index([userId])
+}
+
+model Mention {
+  id              String   @id @default(cuid())
+  commentId       String
+  mentionedUserId String
+  createdAt       DateTime @default(now())
+
+  // Relations
+  comment       Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  mentionedUser User    @relation(fields: [mentionedUserId], references: [id])
+
+  @@index([commentId])
+  @@index([mentionedUserId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}

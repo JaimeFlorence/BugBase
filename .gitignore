@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# Uploads
+uploads/
+public/uploads/
+temp/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Docker
+.docker/
+
+# Misc
+.eslintcache
+.stylelintcache
+*.pid
+*.seed
+*.pid.lock
