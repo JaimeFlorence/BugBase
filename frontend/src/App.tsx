@@ -14,7 +14,9 @@ import Register from '@/pages/auth/Register';
 import Dashboard from '@/pages/Dashboard';
 import Projects from '@/pages/Projects';
 import ProjectDetail from '@/pages/ProjectDetail';
+import Bugs from '@/pages/Bugs';
 import BugDetail from '@/pages/BugDetail';
+import CreateBug from '@/pages/CreateBug';
 import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 
@@ -48,6 +50,9 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
                 <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                <Route path="/bugs" element={<Bugs />} />
+                <Route path="/bugs/new" element={<CreateBug />} />
+                <Route path="/bugs/:bugId" element={<BugDetail />} />
                 <Route path="/projects/:projectId/bugs/:bugId" element={<BugDetail />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/settings" element={<Settings />} />

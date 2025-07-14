@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services/auth.service';
 import { toast } from '@/components/ui/toaster';
@@ -81,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await authService.register(data);
+      await authService.register(data);
       toast({
         title: 'Registration successful!',
         description: 'Please log in with your new account.',

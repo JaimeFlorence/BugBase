@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { errorHandler } from './middleware/errorHandler';
@@ -34,9 +35,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(rateLimiter);
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+
 app.use('/api', routes);
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 

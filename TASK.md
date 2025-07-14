@@ -41,16 +41,57 @@
 - [x] Create base API structure and error handling
 - [x] Set up rate limiting middleware
 - [x] Create seed data script
+- [x] Bug service layer with comprehensive CRUD operations
+- [x] Bug controller with all endpoints
+- [x] Bug routes with proper RESTful endpoints
+- [x] Bug statistics and analytics endpoints
+- [x] Bug watchers management
+- [x] Permission-based access control for bug operations
+- [x] Comment service with full CRUD operations
+- [x] Threaded comments with unlimited nesting
+- [x] @mentions with automatic user notifications
+- [x] Comment controller and RESTful routes
+- [x] Auto-watch bugs when commenting
+- [x] Notifications for bug watchers on new comments
+- [x] File attachment service with upload/download/delete
+- [x] Storage configuration with multer
+- [x] File type validation (50+ supported types)
+- [x] File size limits (10MB max)
+- [x] Attachment controller and routes
+- [x] Static file serving for uploads
+- [x] Project file statistics endpoint
 
 ## In Progress
 
+### Frontend Development ✓
+1. **Bug Management UI**
+   - [x] TypeScript types for all domain models
+   - [x] Bug service with API integration
+   - [x] Project service with API integration
+   - [x] Comment service with full CRUD operations
+   - [x] Attachment service for file management
+   - [x] Status, Priority, and Severity badges
+   - [x] BugCard component with comprehensive info display
+   - [x] BugList component with pagination
+   - [x] Bug filtering (status, priority, search)
+   - [x] Dashboard with real-time statistics
+   - [x] Bugs page with full listing
+   - [x] Bug detail view with comments and attachments
+   - [x] Comment component with threaded replies
+   - [x] Bug creation form
+   - [x] Watch/Unwatch functionality
+   - [ ] Bug editing functionality
+   - [ ] File upload UI
+
 ### Phase 2: Core Features
-1. **Bug Management**
-   - [ ] CRUD API for bugs
-   - [ ] Bug listing with pagination
-   - [ ] Bug detail view
-   - [ ] Status workflow implementation
-   - [ ] Priority and severity handling
+1. **Bug Management** ✓
+   - [x] CRUD API for bugs
+   - [x] Bug listing with pagination and filtering
+   - [x] Bug detail view
+   - [x] Status workflow implementation
+   - [x] Priority and severity handling
+   - [x] Bug watchers functionality
+   - [x] Bug statistics endpoint
 
 ## Upcoming Tasks
 
@@ -75,24 +116,35 @@
    - [x] Set up API service layer with Axios
 
 ### Phase 2: Core Features
-1. **Bug Management**
-   - [ ] CRUD API for bugs
-   - [ ] Bug listing with pagination
-   - [ ] Bug detail view
-   - [ ] Status workflow implementation
-   - [ ] Priority and severity handling
+1. **Bug Management** ✓
+   - [x] CRUD API for bugs
+   - [x] Bug listing with pagination and filtering
+   - [x] Bug detail view
+   - [x] Status workflow implementation
+   - [x] Priority and severity handling
+   - [x] Bug watchers functionality
+   - [x] Bug statistics endpoint
 
-2. **Comments System**
-   - [ ] Comment CRUD operations
-   - [ ] Threaded comments support
-   - [ ] Markdown rendering
-   - [ ] @mentions functionality
+2. **Comments System** ✓
+   - [x] Comment CRUD operations
+   - [x] Threaded comments support
+   - [x] @mentions functionality with notifications
+   - [x] Comment editing with mention updates
+   - [x] Auto-add commenter as bug watcher
+   - [x] Notifications for watchers
+   - [ ] Markdown rendering (frontend task)
 
-3. **File Attachments**
-   - [ ] File upload endpoint
-   - [ ] Storage configuration (MinIO/S3)
-   - [ ] Image preview support
-   - [ ] File size and type validation
+3. **File Attachments** ✓
+   - [x] File upload endpoint with multer
+   - [x] Local storage configuration (filesystem)
+   - [x] File size and type validation
+   - [x] Download and delete functionality
+   - [x] Attachment service with permissions
+   - [x] Support for bug and comment attachments
+   - [x] Project file statistics
+   - [x] Extensive file type support (images, documents, code, archives)
+   - [ ] Image preview support (frontend task)
+   - [ ] S3/MinIO integration (future enhancement)
 
 ### Phase 3: Advanced Features
 1. **Search & Filtering**
