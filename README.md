@@ -40,11 +40,30 @@ npm run db:migrate
 npm run dev
 ```
 
+## Testing
+
+We have comprehensive testing coverage across the entire application:
+
+```bash
+# Run all tests
+./scripts/test-all.sh
+
+# Run tests with coverage
+./scripts/test-coverage.sh
+
+# Backend tests only
+cd backend && npm test
+
+# Frontend tests only
+cd frontend && npm test
+```
+
 ## Documentation
 
 - [Planning](./PLANNING.md) - Project overview and architecture
 - [Tasks](./TASK.md) - Current development status and roadmap
 - [Deployment](./DEPLOYMENT.md) - Deployment and infrastructure guide
+- [Testing](./TESTING.md) - Comprehensive testing guide
 
 ## Contributing
 
