@@ -2,6 +2,7 @@ import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 import {
   Bug,
   Home,
@@ -146,6 +147,9 @@ export default function MainLayout() {
           </Button>
 
           <div className="flex-1" />
+
+          {/* Connection status */}
+          <ConnectionStatus />
 
           {/* Theme toggle */}
           <Button

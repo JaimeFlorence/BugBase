@@ -104,6 +104,36 @@ class AttachmentService {
     return response.data.data!.stats;
   }
 
+  // Upload bug attachment
+  async uploadBugAttachment(bugId: string, formData: FormData): Promise<Attachment> {
+    const response = await api.post<ApiResponse<{ attachments: Attachment[]; count: number }>>(
+      '/attachments/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        params: { bugId }
+      }
+    );
+    return response.data.data!.attachments[0];
+  }
+
+  // Upload comment attachment
+  async uploadCommentAttachment(commentId: string, formData: FormData): Promise<Attachment> {
+    const response = await api.post<ApiResponse<{ attachments: Attachment[]; count: number }>>(
+      '/attachments/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        params: { commentId }
+      }
+    );
+    return response.data.data!.attachments[0];
+  }
+
   // Format file size
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes';

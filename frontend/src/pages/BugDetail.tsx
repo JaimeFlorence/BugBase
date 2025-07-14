@@ -24,16 +24,20 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { Comment } from '@/components/Comment';
+import { FileUpload } from '@/components/FileUpload';
+import { UserPresence } from '@/components/UserPresence';
 import bugService from '@/services/bug.service';
 import commentService from '@/services/comment.service';
 import attachmentService from '@/services/attachment.service';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSocket } from '@/contexts/SocketContext';
 import type { Bug, Comment as CommentType } from '@/types';
 
 export default function BugDetail() {
   const { bugId } = useParams<{ bugId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { socket, joinRoom, leaveRoom } = useSocket();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState('');
   const [isWatching, setIsWatching] = useState(false);
@@ -65,6 +69,70 @@ export default function BugDetail() {
       setIsWatching(bug.watchers?.some(w => w.userId === user.id) || false);
     }
   }, [bug, user]);
+
+  // Join bug room for real-time updates
+  useEffect(() => {
+    if (bugId && socket) {
+      const roomName = `bug:${bugId}`;
+      joinRoom(roomName);
+
+      // Listen for real-time updates
+      const handleBugUpdate = (updatedBug: Bug) => {
+        queryClient.setQueryData(['bug', bugId], updatedBug);
+      };
+
+      const handleNewComment = (comment: CommentType) => {
+        queryClient.setQueryData(['bug-comments', bugId], (oldComments: CommentType[] = []) => {
+          // Check if comment already exists to avoid duplicates
+          if (oldComments.some(c => c.id === comment.id)) {
+            return oldComments;
+          }
+          return [...oldComments, comment];
+        });
+        
+        // Also refresh bug data to update comment count
+        queryClient.invalidateQueries({ queryKey: ['bug', bugId] });
+      };
+
+      const handleCommentUpdate = (updatedComment: CommentType) => {
+        queryClient.setQueryData(['bug-comments', bugId], (oldComments: CommentType[] = []) => {
+          return oldComments.map(comment => 
+            comment.id === updatedComment.id ? updatedComment : comment
+          );
+        });
+      };
+
+      const handleCommentDelete = (deletedCommentId: string) => {
+        queryClient.setQueryData(['bug-comments', bugId], (oldComments: CommentType[] = []) => {
+          return oldComments.filter(comment => comment.id !== deletedCommentId);
+        });
+        
+        // Also refresh bug data to update comment count
+        queryClient.invalidateQueries({ queryKey: ['bug', bugId] });
+      };
+
+      const handleAttachmentUpdate = () => {
+        queryClient.invalidateQueries({ queryKey: ['bug-attachments', bugId] });
+      };
+
+      socket.on(`bug:${bugId}:updated`, handleBugUpdate);
+      socket.on(`bug:${bugId}:comment:new`, handleNewComment);
+      socket.on(`bug:${bugId}:comment:updated`, handleCommentUpdate);
+      socket.on(`bug:${bugId}:comment:deleted`, handleCommentDelete);
+      socket.on(`bug:${bugId}:attachment:added`, handleAttachmentUpdate);
+      socket.on(`bug:${bugId}:attachment:deleted`, handleAttachmentUpdate);
+
+      return () => {
+        socket.off(`bug:${bugId}:updated`, handleBugUpdate);
+        socket.off(`bug:${bugId}:comment:new`, handleNewComment);
+        socket.off(`bug:${bugId}:comment:updated`, handleCommentUpdate);
+        socket.off(`bug:${bugId}:comment:deleted`, handleCommentDelete);
+        socket.off(`bug:${bugId}:attachment:added`, handleAttachmentUpdate);
+        socket.off(`bug:${bugId}:attachment:deleted`, handleAttachmentUpdate);
+        leaveRoom(roomName);
+      };
+    }
+  }, [bugId, socket, joinRoom, leaveRoom, queryClient]);
 
   // Mutations
   const deleteBugMutation = useMutation({
@@ -203,7 +271,9 @@ export default function BugDetail() {
             <h1 className="text-2xl font-bold">{bug.title}</h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <UserPresence bugId={bugId} />
+            
             <Button
               variant="outline"
               size="sm"
@@ -261,12 +331,24 @@ export default function BugDetail() {
           </div>
 
           {/* Attachments */}
-          {attachments.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Paperclip className="h-5 w-5" />
-                Attachments ({attachments.length})
-              </h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Paperclip className="h-5 w-5" />
+              Attachments ({attachments.length})
+            </h2>
+            
+            {/* File upload */}
+            <div className="mb-4">
+              <FileUpload
+                bugId={bugId}
+                onUploadComplete={() => {
+                  queryClient.invalidateQueries({ queryKey: ['bug-attachments', bugId] });
+                }}
+              />
+            </div>
+
+            {/* Attachments list */}
+            {attachments.length > 0 && (
               <div className="space-y-2">
                 {attachments.map((attachment) => (
                   <div
@@ -283,20 +365,50 @@ export default function BugDetail() {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        attachmentService.downloadAttachment(attachment.id, attachment.originalName)
-                      }
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          attachmentService.downloadAttachment(attachment.id, attachment.originalName)
+                        }
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {(user?.id === attachment.uploadedById || user?.role === 'ADMIN') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this attachment?')) {
+                              try {
+                                await attachmentService.deleteAttachment(attachment.id);
+                                queryClient.invalidateQueries({ queryKey: ['bug-attachments', bugId] });
+                                toast({
+                                  title: 'Attachment deleted',
+                                  description: 'The attachment has been deleted.',
+                                  type: 'success',
+                                });
+                              } catch (error) {
+                                toast({
+                                  title: 'Error',
+                                  description: 'Failed to delete attachment.',
+                                  type: 'error',
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Comments */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">

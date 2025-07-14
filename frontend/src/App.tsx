@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { SocketProvider } from '@/contexts/SocketContext';
 import { Toaster } from '@/components/ui/toaster';
 
 // Layouts
@@ -14,9 +15,12 @@ import Register from '@/pages/auth/Register';
 import Dashboard from '@/pages/Dashboard';
 import Projects from '@/pages/Projects';
 import ProjectDetail from '@/pages/ProjectDetail';
+import CreateProject from '@/pages/CreateProject';
+import EditProject from '@/pages/EditProject';
 import Bugs from '@/pages/Bugs';
 import BugDetail from '@/pages/BugDetail';
 import CreateBug from '@/pages/CreateBug';
+import EditBug from '@/pages/EditBug';
 import Profile from '@/pages/Profile';
 import Settings from '@/pages/Settings';
 
@@ -36,7 +40,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <Router>
+          <SocketProvider>
+            <Router>
             <Routes>
               {/* Auth Routes */}
               <Route element={<AuthLayout />}>
@@ -49,17 +54,21 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/projects" element={<Projects />} />
+                <Route path="/projects/new" element={<CreateProject />} />
                 <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                <Route path="/projects/:projectId/edit" element={<EditProject />} />
                 <Route path="/bugs" element={<Bugs />} />
                 <Route path="/bugs/new" element={<CreateBug />} />
                 <Route path="/bugs/:bugId" element={<BugDetail />} />
+                <Route path="/bugs/:bugId/edit" element={<EditBug />} />
                 <Route path="/projects/:projectId/bugs/:bugId" element={<BugDetail />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
             </Routes>
-          </Router>
-          <Toaster />
+            </Router>
+            <Toaster />
+          </SocketProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
