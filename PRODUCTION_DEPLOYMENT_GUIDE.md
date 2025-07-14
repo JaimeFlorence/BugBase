@@ -1,25 +1,143 @@
 # Production Deployment Guide for BugBase
 
 ## Overview
-This guide provides step-by-step instructions for deploying BugBase to production using Docker, GitHub Actions CI/CD, and comprehensive monitoring.
+This guide provides comprehensive instructions for deploying BugBase to production. We offer two deployment methods:
+
+1. **🚀 Automated Deployment (Recommended)** - Zero-manual-steps deployment using our automated script
+2. **📋 Manual Deployment** - Step-by-step manual deployment for custom configurations
 
 ## Prerequisites
 
 ### Server Requirements
-- **OS**: Ubuntu 20.04 LTS or newer
+- **OS**: Ubuntu 20.04 LTS or newer (Ubuntu 22.04 LTS recommended)
 - **CPU**: Minimum 4 cores, recommended 8 cores
 - **RAM**: Minimum 8GB, recommended 16GB
 - **Storage**: 100GB SSD (more for data growth)
 - **Network**: Static IP, ports 80, 443 open
+- **Domain**: Valid domain name with DNS control
 
-### Software Requirements
-- Docker 20.10+
-- Docker Compose 2.0+
-- Git
-- AWS CLI (for S3 backups)
-- Domain name with DNS control
+### Required Information
+- GitHub repository URL
+- Domain name for the application
+- Email address for SSL certificates
+- AWS credentials (optional, for S3 backups)
 
-## 🚀 Deployment Steps
+---
+
+## 🚀 Automated Deployment (Recommended)
+
+### Quick Start
+Deploy BugBase to production with a single command:
+
+```bash
+# Download and run the automated deployment script
+curl -fsSL https://raw.githubusercontent.com/yourusername/bugbase/main/scripts/deploy-production.sh -o deploy.sh
+chmod +x deploy.sh
+
+# Run automated deployment
+sudo ./deploy.sh \
+  --repo-url https://github.com/yourusername/bugbase.git \
+  --domain your-domain.com \
+  --email admin@your-domain.com
+```
+
+### Automated Script Features
+
+✅ **Zero Manual Steps** - Complete automation from fresh server to production-ready application  
+✅ **Security Hardening** - Firewall, fail2ban, user management, and secure defaults  
+✅ **SSL/TLS Automation** - Let's Encrypt certificate generation and auto-renewal  
+✅ **Error Handling** - Comprehensive error detection and automatic rollback  
+✅ **Health Verification** - Automatic testing of all services and endpoints  
+✅ **Monitoring Setup** - Full observability stack with Prometheus, Grafana, and Loki  
+✅ **Backup Configuration** - Automated daily backups with S3 integration  
+✅ **Performance Optimization** - Parallel operations and optimized resource usage  
+
+### Script Options
+
+```bash
+sudo ./deploy-production.sh [OPTIONS]
+
+REQUIRED OPTIONS:
+  --repo-url URL        GitHub repository URL
+  --domain DOMAIN       Primary domain name (for SSL)
+  --email EMAIL         Admin email for SSL certificates
+
+OPTIONAL OPTIONS:
+  --branch BRANCH       Git branch to deploy (default: main)
+  --dry-run            Simulate deployment without making changes
+  --skip-ssl           Skip SSL certificate generation
+  --skip-monitoring    Skip monitoring stack deployment
+  --help               Show detailed help message
+
+EXAMPLES:
+  # Basic production deployment
+  sudo ./deploy-production.sh \
+    --repo-url https://github.com/user/bugbase.git \
+    --domain bugbase.com \
+    --email admin@bugbase.com
+
+  # Deploy specific branch without monitoring
+  sudo ./deploy-production.sh \
+    --repo-url https://github.com/user/bugbase.git \
+    --domain bugbase.com \
+    --email admin@bugbase.com \
+    --branch develop \
+    --skip-monitoring
+
+  # Dry run to test deployment process
+  sudo ./deploy-production.sh \
+    --repo-url https://github.com/user/bugbase.git \
+    --domain bugbase.com \
+    --email admin@bugbase.com \
+    --dry-run
+```
+
+### What the Automated Script Does
+
+1. **System Preparation**
+   - Updates system packages
+   - Installs Docker, Docker Compose, and dependencies
+   - Creates secure system user
+   - Configures Python virtual environment
+
+2. **Repository Setup**
+   - Clones GitHub repository to `/opt/bugbase`
+   - Generates secure environment variables
+   - Sets proper file permissions
+
+3. **Security Configuration**
+   - Configures UFW firewall
+   - Sets up fail2ban intrusion prevention
+   - Generates SSL certificates with Let's Encrypt
+   - Implements security hardening
+
+4. **Application Deployment**
+   - Builds Docker images
+   - Starts all services (PostgreSQL, Redis, Backend, Frontend)
+   - Runs database migrations
+   - Sets up monitoring stack
+
+5. **Verification & Monitoring**
+   - Tests all health endpoints
+   - Configures automated backups
+   - Sets up log rotation
+   - Creates deployment summary
+
+### Post-Deployment
+
+After successful automated deployment:
+
+1. **Update DNS Records** - Point your domain to the server IP
+2. **Review Summary** - Check `/opt/bugbase/deployment-summary.txt`
+3. **Access Application** - Visit `https://your-domain.com`
+4. **Monitor Services** - Access Grafana at `http://server-ip:3001`
+5. **Configure Backups** - Add S3 credentials to `.env.production`
+
+---
+
+## 📋 Manual Deployment
+
+If you prefer manual deployment or need custom configuration:
 
 ### 1. Initial Server Setup
 
