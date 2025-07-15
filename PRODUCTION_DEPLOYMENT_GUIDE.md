@@ -162,7 +162,7 @@ After successful automated deployment:
 1. **Update DNS Records** - Point your domain to the server IP
 2. **Review Summary** - Check `/opt/bugbase/deployment-summary.txt`
 3. **Access Application** - Visit `https://your-domain.com`
-4. **Monitor Services** - Access Grafana at `http://server-ip:3001`
+4. **Monitor Services** - Access Grafana at `http://153.92.214.14:3001`
 5. **Configure Backups** - Add S3 credentials to `.env.production`
 
 ---

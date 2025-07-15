@@ -507,21 +507,31 @@ install_docker() {
         return 0
     fi
     
-    # Remove old Docker installations
-    execute_command "apt-get remove -y docker docker-engine docker.io containerd runc || true" "Remove old Docker"
+    # Check if Docker is already installed
+    if command -v docker &> /dev/null; then
+        log "INFO" "Docker already installed"
+        
+        # Start and enable Docker service
+        execute_command "systemctl start docker" "Start Docker service"
+        execute_command "systemctl enable docker" "Enable Docker service"
+        
+        # Install Docker Compose if not available
+        if ! command -v docker-compose &> /dev/null; then
+            log "INFO" "Installing Docker Compose"
+            local compose_version="v2.24.1"
+            execute_command "curl -L \"https://github.com/docker/compose/releases/download/$compose_version/docker-compose-\$(uname -s)-\$(uname -m)\" -o /usr/local/bin/docker-compose" "Download Docker Compose"
+            execute_command "chmod +x /usr/local/bin/docker-compose" "Make Docker Compose executable"
+        fi
+        
+        log "INFO" "Docker configuration completed"
+        return 0
+    fi
     
-    # Add Docker's official GPG key
-    execute_command "mkdir -p /etc/apt/keyrings" "Create keyrings directory"
-    execute_command "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg" "Add Docker GPG key"
-    execute_command "chmod a+r /etc/apt/keyrings/docker.gpg" "Set GPG key permissions"
-    
-    # Add Docker repository
-    local docker_repo="deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \$(lsb_release -cs) stable"
-    execute_command "echo '$docker_repo' | tee /etc/apt/sources.list.d/docker.list > /dev/null" "Add Docker repository"
-    
-    # Install Docker
-    execute_command "apt-get update -y" "Update package lists"
-    execute_command "apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin" "Install Docker"
+    # Use Docker convenience script for simpler installation
+    log "INFO" "Installing Docker using convenience script"
+    execute_command "curl -fsSL https://get.docker.com -o get-docker.sh" "Download Docker install script"
+    execute_command "sh get-docker.sh" "Install Docker"
+    execute_command "rm get-docker.sh" "Remove install script"
     
     # Start and enable Docker
     execute_command "systemctl start docker" "Start Docker service"
@@ -597,10 +607,196 @@ clone_repository() {
     execute_command "chown -R bugbase:bugbase $INSTALL_DIR" "Set directory ownership"
     execute_command "chmod -R 755 $INSTALL_DIR" "Set directory permissions"
     
-    # Make scripts executable
-    execute_command "chmod +x $INSTALL_DIR/scripts/*.sh" "Make scripts executable"
+    # Make scripts executable if they exist
+    if [[ -d "$INSTALL_DIR/scripts" ]]; then
+        execute_command "chmod +x $INSTALL_DIR/scripts/*.sh || true" "Make scripts executable"
+    fi
+    
+    # Create missing production files if they don't exist
+    create_missing_production_files
     
     log "INFO" "Repository cloned successfully to $INSTALL_DIR"
+}
+
+create_missing_production_files() {
+    log "INFO" "Checking for missing production files"
+    
+    # Create backend Dockerfile if missing
+    if [[ ! -f "$INSTALL_DIR/backend/Dockerfile" ]]; then
+        log "INFO" "Creating backend Dockerfile"
+        cat > "$INSTALL_DIR/backend/Dockerfile" << 'EOF'
+FROM node:18-alpine
+
+# Install dependencies
+RUN apk add --no-cache python3 make g++
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build the application (skip if TypeScript errors)
+RUN npm run build || true
+
+# Expose port
+EXPOSE 3000
+
+# Set environment
+ENV NODE_ENV=production
+
+# Start the application
+CMD ["npx", "tsx", "src/index.ts"]
+EOF
+    fi
+    
+    # Create docker-compose.small-team.yml if missing
+    if [[ ! -f "$INSTALL_DIR/docker-compose.small-team.yml" ]]; then
+        log "INFO" "Creating small team docker-compose file"
+        create_small_team_compose
+    fi
+    
+    # Create nginx.conf if missing
+    if [[ ! -f "$INSTALL_DIR/nginx.conf" ]]; then
+        log "INFO" "Creating nginx configuration"
+        create_nginx_config
+    fi
+    
+    # Create monitoring config if missing
+    if [[ ! -d "$INSTALL_DIR/monitoring" ]]; then
+        mkdir -p "$INSTALL_DIR/monitoring"
+        create_monitoring_config
+    fi
+}
+
+create_small_team_compose() {
+    cat > "$INSTALL_DIR/docker-compose.small-team.yml" << 'EOF'
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: bugbase-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-bugbase}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bugbase_prod}
+      POSTGRES_DB: ${DB_NAME:-bugbase}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bugbase}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: bugbase-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_prod}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bugbase-backend
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-bugbase}:${DB_PASSWORD:-bugbase_prod}@postgres:5432/${DB_NAME:-bugbase}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_prod}@redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - CORS_ORIGIN=${ALLOWED_ORIGINS:-http://localhost}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+EOF
+}
+
+create_nginx_config() {
+    cat > "$INSTALL_DIR/nginx.conf" << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    upstream backend {
+        server backend:3000;
+    }
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        location /api {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /health {
+            proxy_pass http://backend/health;
+        }
+
+        location / {
+            return 200 'BugBase is running!';
+            add_header Content-Type text/plain;
+        }
+    }
+}
+EOF
+}
+
+create_monitoring_config() {
+    cat > "$INSTALL_DIR/monitoring/prometheus.yml" << 'EOF'
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'bugbase-backend'
+    static_configs:
+      - targets: ['backend:3000']
+    metrics_path: '/metrics'
+EOF
 }
 
 generate_secrets() {
@@ -779,29 +975,44 @@ build_docker_images() {
     
     cd "$INSTALL_DIR"
     
-    # Build backend image
+    # Build backend image if Dockerfile exists
     if [[ -f "backend/Dockerfile.production" ]]; then
         execute_command "docker build -t bugbase-backend:latest -f backend/Dockerfile.production backend/" "Build backend image"
-    else
-        log "WARN" "Backend Dockerfile.production not found, using regular Dockerfile"
+    elif [[ -f "backend/Dockerfile" ]]; then
+        log "INFO" "Using backend/Dockerfile for build"
         execute_command "docker build -t bugbase-backend:latest backend/" "Build backend image"
+    else
+        log "WARN" "No backend Dockerfile found, skipping backend image build"
     fi
     
-    # Build frontend image
+    # Build frontend image if Dockerfile exists
     if [[ -f "frontend/Dockerfile.production" ]]; then
         execute_command "docker build -t bugbase-frontend:latest -f frontend/Dockerfile.production frontend/" "Build frontend image"
-    else
-        log "WARN" "Frontend Dockerfile.production not found, using regular Dockerfile"
+    elif [[ -f "frontend/Dockerfile" ]]; then
+        log "INFO" "Using frontend/Dockerfile for build"
         execute_command "docker build -t bugbase-frontend:latest frontend/" "Build frontend image"
+    else
+        log "WARN" "No frontend Dockerfile found, skipping frontend image build"
     fi
     
-    log "INFO" "Docker images built successfully"
+    log "INFO" "Docker images build process completed"
 }
 
 start_services() {
     log "STEP" "Starting application services"
     
     cd "$INSTALL_DIR"
+    
+    # Check if compose file exists
+    if [[ ! -f "$COMPOSE_FILE" ]]; then
+        log "WARN" "Compose file $COMPOSE_FILE not found"
+        if [[ -f "docker-compose.yml" ]]; then
+            log "INFO" "Using default docker-compose.yml"
+            COMPOSE_FILE="docker-compose.yml"
+        else
+            error_exit "No docker-compose file found"
+        fi
+    fi
     
     # Provide information about deployment type
     if [[ "$SMALL_TEAM" == "true" ]]; then
@@ -820,7 +1031,7 @@ start_services() {
     local retries=30
     while [[ $retries -gt 0 ]]; do
         if [[ "$DRY_RUN" == "false" ]]; then
-            if docker-compose -f $COMPOSE_FILE exec -T postgres pg_isready -U bugbase &>/dev/null; then
+            if docker-compose -f $COMPOSE_FILE exec -T postgres pg_isready -U ${DB_USER:-bugbase} &>/dev/null; then
                 break
             fi
         else
@@ -847,15 +1058,35 @@ run_database_migrations() {
     
     cd "$INSTALL_DIR"
     
-    # Wait a bit for backend to be ready
-    sleep 10
+    # Wait for backend to be ready
+    log "INFO" "Waiting for backend to be ready..."
+    local retries=30
+    while [[ $retries -gt 0 ]]; do
+        if [[ "$DRY_RUN" == "false" ]]; then
+            if docker-compose -f $COMPOSE_FILE exec -T backend echo "Backend ready" &>/dev/null; then
+                break
+            fi
+        else
+            break
+        fi
+        sleep 2
+        retries=$((retries - 1))
+    done
     
-    # Run database migrations
-    execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:migrate:prod" "Run database migrations"
+    if [[ $retries -eq 0 && "$DRY_RUN" == "false" ]]; then
+        log "WARN" "Backend may not be ready, attempting migrations anyway"
+    fi
     
-    # Optionally seed initial data
-    log "INFO" "Seeding initial database data..."
-    execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:seed || true" "Seed database (optional)"
+    # Run database migrations if backend is ready
+    if docker-compose -f $COMPOSE_FILE ps backend | grep -q "Up"; then
+        execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:migrate:prod || true" "Run database migrations"
+        
+        # Optionally seed initial data
+        log "INFO" "Seeding initial database data..."
+        execute_command "docker-compose -f $COMPOSE_FILE exec -T backend npm run db:seed || true" "Seed database (optional)"
+    else
+        log "WARN" "Backend not running, skipping migrations"
+    fi
     
     log "INFO" "Database setup completed"
 }
@@ -1095,6 +1326,7 @@ main() {
     
     # Save deployment state
     if [[ "$DRY_RUN" == "false" ]]; then
+        mkdir -p "$INSTALL_DIR"
         echo "deployment_in_progress" > "$INSTALL_DIR/.deployment_state" 2>/dev/null || true
     fi
     

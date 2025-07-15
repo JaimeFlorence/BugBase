@@ -25,6 +25,7 @@ Welcome to **BugBase** - your comprehensive bug tracking and project management 
 
 ### First Login
 
+
 1. **Access BugBase** at your organization's URL (e.g., `https://bugs.yourcompany.com`)
 2. **Sign in** with your provided credentials or register if registration is enabled
 3. **Complete your profile** by clicking your avatar → Profile

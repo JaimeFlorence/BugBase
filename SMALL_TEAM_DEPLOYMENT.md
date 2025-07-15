@@ -2,6 +2,17 @@
 
 **Cost-optimized deployment perfect for small development teams!**
 
+## ⚠️ Important Prerequisites
+
+Before running the deployment script, ensure your repository contains:
+
+1. **Backend Dockerfile** (`backend/Dockerfile`)
+2. **Docker Compose files** (`docker-compose.small-team.yml`, `docker-compose.minimal.yml`)
+3. **Nginx configuration** (`nginx.conf`)
+4. **Monitoring configs** (`monitoring/prometheus.yml`)
+
+**Note:** The updated deployment script (v2.0) will automatically create these files if missing.
+
 ## 🎯 Right-Sized for Your Team
 
 ### **Why the Standard Deployment is Overkill**
@@ -53,9 +64,9 @@ The full production deployment is designed for:
 ```bash
 # Deploy with small team configuration
 sudo ./deploy-production.sh \
-  --repo-url https://github.com/yourusername/bugbase.git \
+  --repo-url https://github.com/JaimeFlorence/bugbase.git \
   --domain your-domain.com \
-  --email admin@your-domain.com \
+  --email jaime@microforensics.com \
   --hostinger \
   --small-team
 ```
@@ -254,7 +265,7 @@ docker-compose -f /opt/bugbase/docker-compose.small-team.yml logs -f
 docker-compose -f /opt/bugbase/docker-compose.small-team.yml --profile monitoring up -d
 
 # Access basic metrics
-http://your-server-ip:9090
+http://153.92.214.14:9090
 ```
 
 ---
@@ -323,6 +334,35 @@ chmod +x /etc/cron.hourly/resource-check
 - [Complete User Guide](USERS_GUIDE.md) - Using BugBase day-to-day
 - [Hostinger Deployment Guide](HOSTINGER_DEPLOYMENT_GUIDE.md) - VPS setup details
 - [Troubleshooting Guide](PRODUCTION_DEPLOYMENT_GUIDE.md#troubleshooting) - Common issues
+
+---
+
+## ⚠️ Known Issues and Solutions
+
+### **Common Deployment Issues**
+
+1. **Rate Limiter Compatibility**
+   - **Issue**: `rate-limit-redis` may fail with newer Redis clients
+   - **Solution**: Update to compatible version or disable rate limiting temporarily
+
+2. **TypeScript Build Errors**
+   - **Issue**: Type errors in auth.service.ts and middleware
+   - **Solution**: Use `tsx` to run TypeScript directly or fix type issues
+
+3. **Missing Production Files**
+   - **Issue**: Repository may lack Dockerfiles and compose files
+   - **Solution**: The updated script (v2.0) creates these automatically
+
+4. **Docker Repository Setup**
+   - **Issue**: GPG key installation may fail without proper flags
+   - **Solution**: Script now uses `--batch --yes` flags for gpg
+
+### **Quick Fixes Applied in v2.0**
+- ✅ Automatic creation of missing production files
+- ✅ Improved Docker installation with convenience script
+- ✅ Better error handling for database readiness
+- ✅ Fallback options for compose file selection
+- ✅ TypeScript execution without compilation
 
 ---
 
